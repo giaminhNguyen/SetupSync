@@ -8,6 +8,7 @@
 
 #Extension
 `Chorme:
+- Ai Exporter : https://chromewebstore.google.com/detail/ai-exporter-save-chatgpt/kagjkiiecagemklhmhkabbalfpbianbe
 - ChatGPT Exporter : https://chromewebstore.google.com/detail/chatgpt-exporter-chatgpt/ilmdofdhpnhffldihboadndccenlnfll
 - Chống lừa đảo : https://chromewebstore.google.com/detail/chongluadao/mdcemplfpeifcogglenloohjghjbigni
 - Dịch màn hình : https://chromewebstore.google.com/detail/ddict-ai-translation-writ/bpggmmljdiliancllaapiggllnkbjocb
