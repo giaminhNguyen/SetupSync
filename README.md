@@ -1,5 +1,6 @@
 #Crack
 - Crack Jetbrain : https://3.jetbra.in/
+
 #UserScript : 
 - Từ chối web chạy ngầm : https://greasyfork.org/en/scripts/482724-reject-serviceworker-auto
 - Tránh tracking : https://greasyfork.org/en/scripts/456881-%E8%B7%9F%E8%B8%AA%E9%93%BE%E6%8E%A5%E5%87%80%E5%8C%96
