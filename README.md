@@ -7,7 +7,9 @@
 - Download apk trực tiếp từ trên chplay về : https://greasyfork.org/scripts/33005
 - Export cho AI Chat : https://greasyfork.org/en/scripts/545017-ai-chat-to-docx-md-html-pdf-json-txt
 - Thay đổi tốc độ chạy web : https://greasyfork.org/en/scripts/372673-%E8%AE%A1%E6%97%B6%E5%99%A8%E6%8E%8C%E6%8E%A7%E8%80%85-%E8%A7%86%E9%A2%91%E5%B9%BF%E5%91%8A%E8%B7%B3%E8%BF%87-%E8%A7%86%E9%A2%91%E5%B9%BF%E5%91%8A%E5%8A%A0%E9%80%9F%E5%99%A8
-- Tải trực tiếp từ youtube : https://greasyfork.org/vi/scripts/481954-youtube-direct-downloader
+- Tải trực tiếp video từ yt,tiktok,ins,.. : https://greasyfork.org/en/scripts/563321-all-in-one-video-downloader-hd-youtube-tiktok-instagram-x-more
+- Auto Skip YouTube Ads : https://greasyfork.org/en/scripts/553239-auto-skip-youtube-ads
+- YouTube Age Restriction Bypass : https://greasyfork.org/en/scripts/519077-simple-youtube-age-restriction-bypass
 
 #Extension
 `Chorme:
