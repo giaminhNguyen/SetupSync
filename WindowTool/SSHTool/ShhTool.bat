@@ -2,7 +2,6 @@
 setlocal EnableExtensions EnableDelayedExpansion
 title Công cụ quản lý SSH
 chcp 65001 >nul
-color 0B
 
 set "SSH_DIR=%USERPROFILE%\.ssh"
 set "CONFIG_FILE=%SSH_DIR%\config"
@@ -15,16 +14,14 @@ if not exist "%CONFIG_FILE%" type nul > "%CONFIG_FILE%"
 cls
 call :HEADER
 echo.
-echo   ╔════════════════════════════════════════════════════════════╗
-echo   ║                        MENU CHÍNH                         ║
-echo   ╠════════════════════════════════════════════════════════════╣
-echo   ║  [1] Danh sách SSH key / Copy public key                  ║
-echo   ║  [2] Tạo SSH mới                                          ║
-echo   ║  [3] Thêm / sửa / xoá cấu hình host                       ║
-echo   ║  [4] Xoá SSH key                                          ║
-echo   ║  [5] Xem nội dung config                                 ║
-echo   ║  [0] Thoát                                                ║
-echo   ╚════════════════════════════════════════════════════════════╝
+call :BOX "MENU CHÍNH"
+echo.
+call :MENU_ITEM 1 "Danh sách SSH key / Copy public key" 0A
+call :MENU_ITEM 2 "Tạo SSH mới" 0B
+call :MENU_ITEM 3 "Thêm / sửa / xoá cấu hình host" 0D
+call :MENU_ITEM 4 "Xoá SSH key" 0C
+call :MENU_ITEM 5 "Xem nội dung config" 0E
+call :MENU_ITEM 0 "Thoát" 07
 echo.
 color 0E
 choice /c 123450 /n /m "  Chọn chức năng: "
@@ -40,12 +37,32 @@ if "%opt%"=="6" exit /b
 goto MENU
 
 :HEADER
+color 0B
+echo ╔════════════════════════════════════════════════════════════════════╗
 color 0A
-echo ╔════════════════════════════════════════════════════════════╗
-echo ║                    CÔNG CỤ QUẢN LÝ SSH                    ║
-echo ╠════════════════════════════════════════════════════════════╣
+echo ║                       CÔNG CỤ QUẢN LÝ SSH                        ║
+color 0B
+echo ╠════════════════════════════════════════════════════════════════════╣
 echo ║  Thư mục SSH: %SSH_DIR%
-echo ╚════════════════════════════════════════════════════════════╝
+echo ╚════════════════════════════════════════════════════════════════════╝
+exit /b
+
+:BOX
+set "title=%~1"
+color 0A
+echo ╔════════════════════════════════════════════════════════════════════╗
+echo ║%title:~0,66%║
+echo ╚════════════════════════════════════════════════════════════════════╝
+color 0B
+exit /b
+
+:MENU_ITEM
+set "num=%~1"
+set "text=%~2"
+set "mc=%~3"
+if "%mc%"=="" set "mc=0B"
+color %mc%
+echo   [%num%] %text%
 color 0B
 exit /b
 
@@ -61,11 +78,7 @@ goto MENU
 cls
 call :HEADER
 echo.
-color 0A
-echo   ╔════════════════════════════════════════════════════════════╗
-echo   ║             DANH SÁCH SSH KEY VÀ PUBLIC KEY              ║
-echo   ╚════════════════════════════════════════════════════════════╝
-color 0B
+call :BOX "DANH SÁCH SSH KEY VÀ PUBLIC KEY"
 echo.
 
 set /a KEY_COUNT=0
@@ -77,7 +90,9 @@ for /f "delims=" %%F in ('dir /b /a-d "%SSH_DIR%" 2^>nul') do (
         echo   [!KEY_COUNT!] Private: %%F
         color 0B
         if exist "%SSH_DIR%\%%F.pub" (
+            color 0A
             echo       Public : %%F.pub
+            color 0B
         ) else (
             color 0C
             echo       Public : (không tìm thấy)
@@ -94,11 +109,12 @@ if !KEY_COUNT! EQU 0 (
     echo.
 )
 
-color 0E
+color 0A
 echo   [C] Copy public key theo số
-echo   [M] Quay về menu
 color 0B
+echo   [M] Quay về menu
 echo.
+color 0E
 choice /c CM /n /m "  Chọn thao tác: "
 if errorlevel 2 goto MENU
 goto COPY_PUB
@@ -107,11 +123,7 @@ goto COPY_PUB
 cls
 call :HEADER
 echo.
-color 0A
-echo   ╔════════════════════════════════════════════════════════════╗
-echo   ║                    COPY PUBLIC KEY                        ║
-echo   ╚═══════════════��════════════════════════════════════════════╝
-color 0B
+call :BOX "COPY PUBLIC KEY"
 echo.
 
 call :SHOW_KEYS_SELECT
@@ -122,30 +134,19 @@ if errorlevel 1 goto MENU
 
 call :GET_KEY_BY_INDEX "!COPY_INDEX!" COPY_KEY
 if errorlevel 1 (
-    color 0C
-    echo.
-    echo   Số không hợp lệ.
-    color 0B
+    call :MSG_ERROR "Số không hợp lệ."
     call :PAUSE_MENU
     goto MENU
 )
 
 if not exist "%SSH_DIR%\!COPY_KEY!.pub" (
-    color 0C
-    echo.
-    echo   Không tìm thấy file public key.
-    color 0B
+    call :MSG_ERROR "Không tìm thấy file public key."
     call :PAUSE_MENU
     goto MENU
 )
 
 powershell -NoProfile -Command "Get-Content -Raw '%SSH_DIR%\!COPY_KEY!.pub' | Set-Clipboard"
-color 0A
-echo.
-echo   Đã copy public key vào clipboard:
-color 0B
-echo   %SSH_DIR%\!COPY_KEY!.pub
-echo.
+call :MSG_OK "Đã copy public key vào clipboard: %SSH_DIR%\!COPY_KEY!.pub"
 call :PAUSE_MENU
 goto MENU
 
@@ -153,11 +154,7 @@ goto MENU
 cls
 call :HEADER
 echo.
-color 0A
-echo   ╔════════════════════════════════════════════════════════════╗
-echo   ║                         TẠO SSH MỚI                       ║
-echo   ╚════════════════════════════════════════════════════════════╝
-color 0B
+call :BOX "TẠO SSH MỚI"
 echo.
 
 call :INPUT_TEXT "Tên key mới (Q để về menu)" NEW_KEY
@@ -171,10 +168,7 @@ if /i "!NEW_EMAIL!"=="q" goto MENU
 if "!NEW_EMAIL!"=="" goto MENU
 
 if exist "%SSH_DIR%\!NEW_KEY!" (
-    color 0C
-    echo.
-    echo   Key đã tồn tại: !NEW_KEY!
-    color 0B
+    call :MSG_ERROR "Key đã tồn tại: !NEW_KEY!"
     call :PAUSE_MENU
     goto MENU
 )
@@ -185,10 +179,7 @@ echo   Đang tạo key...
 color 0B
 ssh-keygen -t ed25519 -C "!NEW_EMAIL!" -f "%SSH_DIR%\!NEW_KEY!"
 
-color 0A
-echo.
-echo   Hoàn tất.
-color 0B
+call :MSG_OK "Hoàn tất."
 call :PAUSE_MENU
 goto MENU
 
@@ -196,11 +187,7 @@ goto MENU
 cls
 call :HEADER
 echo.
-color 0A
-echo   ╔════════════════════════════════════════════════════════════╗
-echo   ║            THÊM / SỬA / XOÁ CẤU HÌNH HOST                 ║
-echo   ╚════════════════════════════════════════════════════════════╝
-color 0B
+call :BOX "THÊM / SỬA / XOÁ CẤU HÌNH HOST"
 echo.
 
 call :SHOW_KEYS_SELECT
@@ -211,21 +198,15 @@ if errorlevel 1 goto MENU
 
 call :GET_KEY_BY_INDEX "!KEY_INDEX!" SELECTED_KEY
 if errorlevel 1 (
-    color 0C
-    echo.
-    echo   Số key không hợp lệ.
-    color 0B
+    call :MSG_ERROR "Số key không hợp lệ."
     call :PAUSE_MENU
     goto MENU
 )
 
-color 0A
-echo.
-echo   Key đã chọn: !SELECTED_KEY!
-color 0B
+call :MSG_INFO "Key đã chọn: !SELECTED_KEY!"
 echo.
 
-call :SHOW_HOSTS_SELECT
+call :SHOW_HOSTS_TABLE
 echo.
 call :INPUT_TEXT "Nhập số host để sửa/xoá, hoặc Enter để thêm mới (Q để về menu)" HOST_CHOICE
 if errorlevel 1 goto MENU
@@ -234,18 +215,12 @@ if "!HOST_CHOICE!"=="" goto ADD_HOST
 
 call :GET_HOST_BY_INDEX "!HOST_CHOICE!" HOST_ALIAS
 if errorlevel 1 (
-    color 0C
-    echo.
-    echo   Số host không hợp lệ.
-    color 0B
+    call :MSG_ERROR "Số host không hợp lệ."
     call :PAUSE_MENU
     goto MENU
 )
 
-color 0E
-echo.
-echo   Host đã chọn: !HOST_ALIAS!
-color 0B
+call :MSG_INFO "Host đã chọn: !HOST_ALIAS!"
 echo   [1] Sửa block
 echo   [2] Xoá block
 echo   [3] Quay lại
@@ -257,10 +232,10 @@ if "!ACT!"=="2" goto DELETE_HOST
 goto MENU
 
 :ADD_HOST
-call :INPUT_TEXT "HostName thật (vd: github.com, gitlab.com)" REAL_HOST
+call :INPUT_TEXT "HostName thật (mặc định: github.com)" REAL_HOST
 if errorlevel 1 goto MENU
 if /i "!REAL_HOST!"=="q" goto MENU
-if "!REAL_HOST!"=="" goto MENU
+if "!REAL_HOST!"=="" set "REAL_HOST=github.com"
 
 call :INPUT_TEXT "Alias trong config" HOST_ALIAS_NEW
 if errorlevel 1 goto MENU
@@ -280,18 +255,15 @@ if "!SSH_PORT!"=="" set "SSH_PORT=22"
 set "IDENTITY_PATH=%SSH_DIR%\!SELECTED_KEY!"
 
 call :APPEND_BLOCK "!HOST_ALIAS_NEW!" "!REAL_HOST!" "!SSH_USER!" "!SSH_PORT!" "!IDENTITY_PATH!"
-color 0A
-echo.
-echo   Đã thêm block cấu hình.
-color 0B
+call :MSG_OK "Đã thêm block cấu hình."
 call :PAUSE_MENU
 goto MENU
 
 :EDIT_HOST
-call :INPUT_TEXT "HostName thật mới" REAL_HOST
+call :INPUT_TEXT "HostName thật mới (mặc định: github.com)" REAL_HOST
 if errorlevel 1 goto MENU
 if /i "!REAL_HOST!"=="q" goto MENU
-if "!REAL_HOST!"=="" goto MENU
+if "!REAL_HOST!"=="" set "REAL_HOST=github.com"
 
 call :INPUT_TEXT "Alias mới" HOST_ALIAS_NEW
 if errorlevel 1 goto MENU
@@ -312,19 +284,13 @@ set "IDENTITY_PATH=%SSH_DIR%\!SELECTED_KEY!"
 
 call :REMOVE_HOST_BLOCK "!HOST_ALIAS!"
 call :APPEND_BLOCK "!HOST_ALIAS_NEW!" "!REAL_HOST!" "!SSH_USER!" "!SSH_PORT!" "!IDENTITY_PATH!"
-color 0A
-echo.
-echo   Đã cập nhật block cấu hình.
-color 0B
+call :MSG_OK "Đã cập nhật block cấu hình."
 call :PAUSE_MENU
 goto MENU
 
 :DELETE_HOST
 call :REMOVE_HOST_BLOCK "!HOST_ALIAS!"
-color 0A
-echo.
-echo   Đã xoá block host: !HOST_ALIAS!
-color 0B
+call :MSG_OK "Đã xoá block host: !HOST_ALIAS!"
 call :PAUSE_MENU
 goto MENU
 
@@ -332,11 +298,7 @@ goto MENU
 cls
 call :HEADER
 echo.
-color 0A
-echo   ╔════════════════════════════════════════════════════════════╗
-echo   ║                         XOÁ SSH KEY                       ║
-echo   ╚════════════════════════════════════════════════════════════╝
-color 0B
+call :BOX "XOÁ SSH KEY"
 echo.
 
 call :SHOW_KEYS_SELECT
@@ -347,18 +309,12 @@ if errorlevel 1 goto MENU
 
 call :GET_KEY_BY_INDEX "!DEL_INDEX!" DEL_KEY
 if errorlevel 1 (
-    color 0C
-    echo.
-    echo   Số key không hợp lệ.
-    color 0B
+    call :MSG_ERROR "Số key không hợp lệ."
     call :PAUSE_MENU
     goto MENU
 )
 
-color 0E
-echo.
-echo   Bạn sắp xoá: !DEL_KEY!
-color 0B
+call :MSG_WARN "Bạn sắp xoá: !DEL_KEY!"
 choice /c YN /n /m "  Xác nhận xoá? [Y/N]: "
 if errorlevel 2 goto MENU
 
@@ -366,10 +322,7 @@ del /f /q "%SSH_DIR%\!DEL_KEY!" >nul 2>nul
 del /f /q "%SSH_DIR%\!DEL_KEY!.pub" >nul 2>nul
 
 call :REMOVE_KEY_FROM_CONFIG "%SSH_DIR%\!DEL_KEY!"
-color 0A
-echo.
-echo   Đã xoá key.
-color 0B
+call :MSG_OK "Đã xoá key."
 call :PAUSE_MENU
 goto MENU
 
@@ -377,17 +330,11 @@ goto MENU
 cls
 call :HEADER
 echo.
-color 0A
-echo   ╔════════════════════════════════════════════════════════════╗
-echo   ║                      NỘI DUNG CONFIG                      ║
-echo   ╚════════════════════════════════════════════════════════════╝
-color 0B
+call :BOX "NỘI DUNG CONFIG"
 echo.
 
 if not exist "%CONFIG_FILE%" (
-    color 0C
-    echo   Chưa có file config.
-    color 0B
+    call :MSG_ERROR "Chưa có file config."
 ) else (
     type "%CONFIG_FILE%"
 )
@@ -407,9 +354,7 @@ for /f "delims=" %%F in ('dir /b /a-d "%SSH_DIR%" 2^>nul') do (
     )
 )
 if !KEY_COUNT! EQU 0 (
-    color 0C
-    echo   Không có SSH key nào.
-    color 0B
+    call :MSG_ERROR "Không có SSH key nào."
     exit /b 1
 )
 echo.
@@ -429,29 +374,44 @@ for /f "delims=" %%F in ('dir /b /a-d "%SSH_DIR%" 2^>nul') do (
 if not defined %outvar% exit /b 1
 exit /b 0
 
-:SHOW_HOSTS_SELECT
-color 0A
-echo   Các host hiện có trong config:
-color 0B
-echo   ------------------------------------------------------------
+:SHOW_HOSTS_TABLE
+call :BOX "BẢNG HOST TRONG CONFIG"
+echo.
+echo   ╔══════╦══════════════════════════════════════╦════════════════╗
+echo   ║  STT ║ ALIAS                                ║ HOSTNAME       ║
+echo   ╠══════╬══════════════════════════════════════╬════════════════╣
 set /a HOST_COUNT=0
 for /f "usebackq tokens=1,* delims= " %%A in ("%CONFIG_FILE%") do (
     if /i "%%A"=="Host" (
         if /i not "%%B"=="*" if /i not "%%B"=="?" (
             set /a HOST_COUNT+=1
             set "HOST!HOST_COUNT!=%%B"
-            color 0E
-            echo   [!HOST_COUNT!] %%B
-            color 0B
+            call :PAD_TRUNC "%%B" 36 HOST_DISP
+            call :GET_HOSTNAME_BY_ALIAS "%%B" HOST_NAME_DISP
+            call :PAD_TRUNC "!HOST_NAME_DISP!" 14 HOSTNAME_DISP
+            echo   ║  !HOST_COUNT!   ║ !HOST_DISP! ║ !HOSTNAME_DISP! ║
         )
     )
 )
+echo   ╚══════╩══════════════════════════════════════╩════════════════╝
 if !HOST_COUNT! EQU 0 (
     color 0C
     echo   (Chưa có host nào)
     color 0B
 )
 echo.
+exit /b 0
+
+:GET_HOSTNAME_BY_ALIAS
+set "alias=%~1"
+set "outvar=%~2"
+set "%outvar%="
+for /f "usebackq tokens=1,* delims= " %%A in ("%CONFIG_FILE%") do (
+    if /i "%%A"=="Host" if /i "%%B"=="%alias%" (
+        set "%outvar%=github.com"
+    )
+)
+if not defined %outvar% set "%outvar%=github.com"
 exit /b 0
 
 :GET_HOST_BY_INDEX
@@ -544,4 +504,40 @@ for /f "usebackq delims=" %%L in ("%CONFIG_FILE%") do (
 )
 
 move /y "%TMP_FILE%" "%CONFIG_FILE%" >nul
+exit /b 0
+
+:MSG_OK
+color 0A
+echo.
+echo   [THÀNH CÔNG] %~1
+color 0B
+exit /b 0
+
+:MSG_ERROR
+color 0C
+echo.
+echo   [LỖI] %~1
+color 0B
+exit /b 0
+
+:MSG_WARN
+color 0E
+echo.
+echo   [CẢNH BÁO] %~1
+color 0B
+exit /b 0
+
+:MSG_INFO
+color 0D
+echo.
+echo   [THÔNG TIN] %~1
+color 0B
+exit /b 0
+
+:PAD_TRUNC
+set "str=%~1"
+set "width=%~2"
+set "outvar=%~3"
+set "%outvar%=%str%                                                                                                    "
+set "%outvar%=!%outvar%:~0,%width%!"
 exit /b 0
