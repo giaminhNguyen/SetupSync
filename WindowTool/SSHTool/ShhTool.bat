@@ -7,8 +7,17 @@ set "SSH_DIR=%USERPROFILE%\.ssh"
 set "CONFIG_FILE=%SSH_DIR%\config"
 set "TMP_FILE=%SSH_DIR%\config.tmp"
 
-if not exist "%SSH_DIR%" mkdir "%SSH_DIR%"
-if not exist "%CONFIG_FILE%" type nul > "%CONFIG_FILE%"
+if not exist "%SSH_DIR%" (
+    mkdir "%SSH_DIR%"
+    echo   [THÔNG TIN] Đã tạo thư mục SSH: %SSH_DIR%
+)
+if not exist "%CONFIG_FILE%" (
+    type nul > "%CONFIG_FILE%"
+    echo   [THÔNG TIN] Đã tự động tạo file config rỗng: %CONFIG_FILE%
+    echo.
+    echo   Nhấn phím bất kỳ để tiếp tục...
+    pause >nul
+)
 
 :MENU
 cls
@@ -21,10 +30,11 @@ call :MENU_ITEM 2 "Tạo SSH mới" 0B
 call :MENU_ITEM 3 "Thêm / sửa / xoá cấu hình host" 0D
 call :MENU_ITEM 4 "Xoá SSH key" 0C
 call :MENU_ITEM 5 "Xem nội dung config" 0E
+call :MENU_ITEM 6 "Test kết nối SSH" 09
 call :MENU_ITEM 0 "Thoát" 07
 echo.
 color 0E
-choice /c 123450 /n /m "  Chọn chức năng: "
+choice /c 1234560 /n /m "  Chọn chức năng: "
 set "opt=%errorlevel%"
 color 0B
 
@@ -33,7 +43,8 @@ if "%opt%"=="2" goto CREATE_KEY
 if "%opt%"=="3" goto MANAGE_HOST
 if "%opt%"=="4" goto DELETE_KEY
 if "%opt%"=="5" goto SHOW_CONFIG
-if "%opt%"=="6" exit /b
+if "%opt%"=="6" goto TEST_SSH
+if "%opt%"=="7" exit /b
 goto MENU
 
 :HEADER
@@ -86,18 +97,30 @@ for /f "delims=" %%F in ('dir /b /a-d "%SSH_DIR%" 2^>nul') do (
     if /i not "%%F"=="config" if /i not "%%F"=="known_hosts" if /i not "%%F"=="known_hosts.old" if /i not "%%~xF"==".pub" (
         set /a KEY_COUNT+=1
         set "KEY!KEY_COUNT!=%%F"
+        REM Lấy ngày file
+        set "KEY_DATE="
+        for %%A in ("%SSH_DIR%\%%F") do set "KEY_DATE=%%~tA"
+        REM Lấy loại key từ file .pub
+        set "KEY_TYPE=(không rõ)"
+        if exist "%SSH_DIR%\%%F.pub" (
+            for /f "tokens=1" %%T in ('type "%SSH_DIR%\%%F.pub" 2^>nul') do (
+                if not defined KEY_TYPE_DONE set "KEY_TYPE=%%T" & set "KEY_TYPE_DONE=1"
+            )
+        )
+        set "KEY_TYPE_DONE="
         color 0E
-        echo   [!KEY_COUNT!] Private: %%F
-        color 0B
+        echo   [!KEY_COUNT!] %%F
+        color 03
+        echo       Loại   : !KEY_TYPE!
+        echo       Ngày   : !KEY_DATE!
         if exist "%SSH_DIR%\%%F.pub" (
             color 0A
             echo       Public : %%F.pub
-            color 0B
         ) else (
             color 0C
             echo       Public : (không tìm thấy)
-            color 0B
         )
+        color 0B
         echo.
     )
 )
@@ -145,7 +168,7 @@ if not exist "%SSH_DIR%\!COPY_KEY!.pub" (
     goto MENU
 )
 
-powershell -NoProfile -Command "Get-Content -Raw '%SSH_DIR%\!COPY_KEY!.pub' | Set-Clipboard"
+type "%SSH_DIR%\!COPY_KEY!.pub" | clip
 call :MSG_OK "Đã copy public key vào clipboard: %SSH_DIR%\!COPY_KEY!.pub"
 call :PAUSE_MENU
 goto MENU
@@ -173,13 +196,38 @@ if exist "%SSH_DIR%\!NEW_KEY!" (
     goto MENU
 )
 
+echo.
+color 0A
+echo   Chọn loại key:
+color 0E
+echo   [1] ed25519  (khuyên dùng - nhanh, an toàn, key ngắn)
+echo   [2] rsa 4096 (tương thích rộng, hỗ trợ hệ thống cũ)
+echo   [3] ecdsa    (cân bằng giữa tốc độ và tương thích)
+color 0B
+echo.
+choice /c 123 /n /m "  Chọn loại key: "
+set "KEY_TYPE_OPT=%errorlevel%"
+
+if "!KEY_TYPE_OPT!"=="1" (
+    set "KEY_TYPE=ed25519"
+    set "KEY_BITS="
+)
+if "!KEY_TYPE_OPT!"=="2" (
+    set "KEY_TYPE=rsa"
+    set "KEY_BITS=-b 4096"
+)
+if "!KEY_TYPE_OPT!"=="3" (
+    set "KEY_TYPE=ecdsa"
+    set "KEY_BITS=-b 521"
+)
+
 color 0E
 echo.
-echo   Đang tạo key...
+echo   Đang tạo key loại !KEY_TYPE!...
 color 0B
-ssh-keygen -t ed25519 -C "!NEW_EMAIL!" -f "%SSH_DIR%\!NEW_KEY!"
+ssh-keygen -t !KEY_TYPE! !KEY_BITS! -C "!NEW_EMAIL!" -f "%SSH_DIR%\!NEW_KEY!"
 
-call :MSG_OK "Hoàn tất."
+call :MSG_OK "Hoàn tất. Đã tạo key !KEY_TYPE!: !NEW_KEY!"
 call :PAUSE_MENU
 goto MENU
 
@@ -342,6 +390,55 @@ echo.
 call :PAUSE_MENU
 goto MENU
 
+:TEST_SSH
+cls
+call :HEADER
+echo.
+call :BOX "TEST KẾT NỐI SSH"
+echo.
+
+call :SHOW_HOSTS_TABLE
+if !HOST_COUNT! EQU 0 (
+    call :MSG_ERROR "Chưa có host nào trong config để test."
+    call :PAUSE_MENU
+    goto MENU
+)
+
+call :INPUT_NUMBER "Chọn số host để test (hoặc Q để về menu)" TEST_INDEX
+if errorlevel 1 goto MENU
+
+call :GET_HOST_BY_INDEX "!TEST_INDEX!" TEST_HOST
+if errorlevel 1 (
+    call :MSG_ERROR "Số host không hợp lệ."
+    call :PAUSE_MENU
+    goto MENU
+)
+
+call :MSG_INFO "Đang test kết nối tới: !TEST_HOST!"
+echo.
+color 0E
+echo   ─────────────────────────────────────────────────────────
+color 0B
+echo.
+ssh -T !TEST_HOST!
+set "SSH_EXIT=!errorlevel!"
+echo.
+color 0E
+echo   ─────────────────────────────────────────────────────────
+color 0B
+echo.
+
+REM GitHub trả về exit code 1 khi xác thực thành công (vì không cho phép shell)
+if "!SSH_EXIT!"=="0" (
+    call :MSG_OK "Kết nối thành công!"
+) else if "!SSH_EXIT!"=="1" (
+    call :MSG_OK "Xác thực thành công! (Server không cho phép shell - bình thường với GitHub/GitLab)"
+) else (
+    call :MSG_ERROR "Kết nối thất bại (exit code: !SSH_EXIT!). Kiểm tra lại cấu hình."
+)
+call :PAUSE_MENU
+goto MENU
+
 :SHOW_KEYS_SELECT
 set /a KEY_COUNT=0
 for /f "delims=" %%F in ('dir /b /a-d "%SSH_DIR%" 2^>nul') do (
@@ -406,12 +503,30 @@ exit /b 0
 set "alias=%~1"
 set "outvar=%~2"
 set "%outvar%="
-for /f "usebackq tokens=1,* delims= " %%A in ("%CONFIG_FILE%") do (
-    if /i "%%A"=="Host" if /i "%%B"=="%alias%" (
-        set "%outvar%=github.com"
+set "found=0"
+for /f "usebackq delims=" %%L in ("%CONFIG_FILE%") do (
+    set "line=%%L"
+    REM Loại bỏ khoảng trắng đầu dòng
+    for /f "tokens=1,* delims= 	" %%X in ("!line!") do (
+        set "keyword=%%X"
+        set "value=%%Y"
+    )
+    if "!found!"=="1" (
+        if /i "!keyword!"=="HostName" (
+            set "%outvar%=!value!"
+            set "found=0"
+            exit /b 0
+        )
+        REM Nếu gặp block Host khác thì dừng
+        if /i "!keyword!"=="Host" (
+            set "found=0"
+        )
+    )
+    if /i "!keyword!"=="Host" if /i "!value!"=="%alias%" (
+        set "found=1"
     )
 )
-if not defined %outvar% set "%outvar%=github.com"
+if not defined %outvar% set "%outvar%=(không rõ)"
 exit /b 0
 
 :GET_HOST_BY_INDEX
