@@ -212,6 +212,14 @@ if errorlevel 1 goto MANAGE_KEY
 if /i "!NEW_KEY!"=="q" goto MANAGE_KEY
 if "!NEW_KEY!"=="" goto MANAGE_KEY
 
+REM Kiểm tra tên key không chứa ký tự đặc biệt hoặc khoảng trắng
+echo "!NEW_KEY!" | findstr /r "[ &^<>|;,%%=]" >nul
+if !errorlevel! EQU 0 (
+    call :MSG_ERROR "Tên key không được chứa khoảng trắng hoặc ký tự đặc biệt."
+    call :PAUSE_MANAGE_KEY
+    goto MANAGE_KEY
+)
+
 call :INPUT_TEXT "Email / comment (Q để quay lại)" NEW_EMAIL
 if errorlevel 1 goto MANAGE_KEY
 if /i "!NEW_EMAIL!"=="q" goto MANAGE_KEY
@@ -304,7 +312,7 @@ set "ACT=%errorlevel%"
 
 if "!ACT!"=="1" goto EDIT_HOST
 if "!ACT!"=="2" goto DELETE_HOST
-goto MENU
+goto MANAGE_HOST
 
 :ADD_HOST
 call :INPUT_TEXT "HostName thật (mặc định: github.com)" REAL_HOST
@@ -335,6 +343,11 @@ call :PAUSE_MENU
 goto MENU
 
 :EDIT_HOST
+if not defined SELECTED_KEY (
+    call :MSG_ERROR "Chưa chọn SSH key. Vui lòng quay lại menu quản lý host."
+    call :PAUSE_MENU
+    goto MENU
+)
 call :INPUT_TEXT "HostName thật mới (mặc định: github.com)" REAL_HOST
 if errorlevel 1 goto MENU
 if /i "!REAL_HOST!"=="q" goto MENU
@@ -424,12 +437,16 @@ echo.
 call :BOX "TEST KẾT NỐI SSH"
 echo.
 
-call :SHOW_HOSTS_TABLE
+set /a HOST_COUNT=0
+for /f "usebackq tokens=1,* delims= " %%A in ("%CONFIG_FILE%") do (
+    if /i "%%A"=="Host" if /i not "%%B"=="*" if /i not "%%B"=="?" set /a HOST_COUNT+=1
+)
 if !HOST_COUNT! EQU 0 (
     call :MSG_ERROR "Chưa có host nào trong config để test."
     call :PAUSE_MANAGE_KEY
     goto MANAGE_KEY
 )
+call :SHOW_HOSTS_TABLE
 
 call :INPUT_NUMBER "Chọn số host để test (hoặc Q để quay lại)" TEST_INDEX
 if errorlevel 1 goto MANAGE_KEY
@@ -572,22 +589,36 @@ if exist "%SSH_DIR%\!EDIT_KEY_NAME!.pub" (
     ren "%SSH_DIR%\!EDIT_KEY_NAME!.pub" "!NEW_NAME!.pub"
 )
 
-REM Cập nhật đường dẫn IdentityFile trong config
+REM Cập nhật đường dẫn IdentityFile trong config (giữ nguyên blank lines)
 if exist "%CONFIG_FILE%" (
     break > "%TMP_FILE%"
-    for /f "usebackq delims=" %%L in ("%CONFIG_FILE%") do (
-        set "line=%%L"
-        set "replaced=0"
-        echo(!line! | findstr /i /c:"%SSH_DIR%\!EDIT_KEY_NAME!" >nul
-        if !errorlevel! EQU 0 (
-            >> "%TMP_FILE%" echo(    IdentityFile %SSH_DIR%\!NEW_NAME!
-            set "replaced=1"
-        )
-        if "!replaced!"=="0" (
-            >> "%TMP_FILE%" echo(!line!
+    for /f "tokens=1* delims=:" %%A in ('findstr /n "^" "%CONFIG_FILE%"') do (
+        set "line=%%B"
+        if "!line!"=="" (
+            >> "%TMP_FILE%" echo.
+        ) else (
+            set "replaced=0"
+            echo(!line! | findstr /i /c:"%SSH_DIR%\!EDIT_KEY_NAME!" >nul
+            if !errorlevel! EQU 0 (
+                >> "%TMP_FILE%" echo(    IdentityFile %SSH_DIR%\!NEW_NAME!
+                set "replaced=1"
+            )
+            if "!replaced!"=="0" (
+                >> "%TMP_FILE%" echo(!line!
+            )
         )
     )
     move /y "%TMP_FILE%" "%CONFIG_FILE%" >nul
+)
+
+REM Cập nhật comment trong file public key
+if exist "%SSH_DIR%\!NEW_NAME!.pub" (
+    for /f "usebackq tokens=1,2" %%X in ("%SSH_DIR%\!NEW_NAME!.pub") do (
+        > "%SSH_DIR%\!NEW_NAME!.pub.tmp" echo %%X %%Y !NEW_NAME!
+    )
+    if exist "%SSH_DIR%\!NEW_NAME!.pub.tmp" (
+        move /y "%SSH_DIR%\!NEW_NAME!.pub.tmp" "%SSH_DIR%\!NEW_NAME!.pub" >nul
+    )
 )
 
 call :MSG_OK "Đã đổi tên key: !EDIT_KEY_NAME! -> !NEW_NAME!"
@@ -641,7 +672,8 @@ for /f "usebackq tokens=1,* delims= " %%A in ("%CONFIG_FILE%") do (
             call :PAD_TRUNC "%%B" 36 HOST_DISP
             call :GET_HOSTNAME_BY_ALIAS "%%B" HOST_NAME_DISP
             call :PAD_TRUNC "!HOST_NAME_DISP!" 14 HOSTNAME_DISP
-            echo   ║  !HOST_COUNT!   ║ !HOST_DISP! ║ !HOSTNAME_DISP! ║
+            call :PAD_TRUNC "!HOST_COUNT!" 4 HC_DISP
+            echo   ║ !HC_DISP! ║ !HOST_DISP! ║ !HOSTNAME_DISP! ║
         )
     )
 )
@@ -741,24 +773,37 @@ if not exist "%CONFIG_FILE%" exit /b 0
 
 break > "%TMP_FILE%"
 set "skip=0"
+set "blank_buf=0"
 
-for /f "usebackq delims=" %%L in ("%CONFIG_FILE%") do (
-    set "line=%%L"
-    if /i "!line:~0,5!"=="Host " (
-        set "currentHost=!line:~5!"
-        if /i "!currentHost!"=="%target%" (
-            set "skip=1"
-        ) else (
-            set "skip=0"
+for /f "tokens=1* delims=:" %%A in ('findstr /n "^" "%CONFIG_FILE%"') do (
+    set "line=%%B"
+    if "!line!"=="" (
+        if "!skip!"=="0" set /a blank_buf+=1
+    ) else (
+        if /i "!line:~0,5!"=="Host " (
+            set "cur=!line:~5!"
+            if /i "!cur!"=="%target%" (
+                set "skip=1"
+                set "blank_buf=0"
+            ) else (
+                set "skip=0"
+            )
         )
-    )
-
-    if "!skip!"=="0" (
-        >> "%TMP_FILE%" echo(!line!
+        if "!skip!"=="0" (
+            call :WRITE_BLANKS !blank_buf!
+            set "blank_buf=0"
+            >> "%TMP_FILE%" echo(!line!
+        ) else (
+            set "blank_buf=0"
+        )
     )
 )
 
 move /y "%TMP_FILE%" "%CONFIG_FILE%" >nul
+exit /b 0
+
+:WRITE_BLANKS
+for /l %%i in (1,1,%~1) do >> "%TMP_FILE%" echo.
 exit /b 0
 
 :REMOVE_KEY_FROM_CONFIG
