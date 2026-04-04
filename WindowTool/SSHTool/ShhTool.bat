@@ -26,25 +26,21 @@ echo.
 call :BOX "MENU CHÍNH"
 echo.
 call :MENU_ITEM 1 "Danh sách SSH key / Copy public key" 0A
-call :MENU_ITEM 2 "Tạo SSH mới" 0B
+call :MENU_ITEM 2 "Quản lý SSH key (tạo / sửa / xoá / test)" 0B
 call :MENU_ITEM 3 "Thêm / sửa / xoá cấu hình host" 0D
-call :MENU_ITEM 4 "Xoá SSH key" 0C
-call :MENU_ITEM 5 "Xem nội dung config" 0E
-call :MENU_ITEM 6 "Test kết nối SSH" 09
+call :MENU_ITEM 4 "Xem nội dung config" 0E
 call :MENU_ITEM 0 "Thoát" 07
 echo.
 color 0E
-choice /c 1234560 /n /m "  Chọn chức năng: "
+choice /c 12340 /n /m "  Chọn chức năng: "
 set "opt=%errorlevel%"
 color 0B
 
 if "%opt%"=="1" goto LIST_KEYS
-if "%opt%"=="2" goto CREATE_KEY
+if "%opt%"=="2" goto MANAGE_KEY
 if "%opt%"=="3" goto MANAGE_HOST
-if "%opt%"=="4" goto DELETE_KEY
-if "%opt%"=="5" goto SHOW_CONFIG
-if "%opt%"=="6" goto TEST_SSH
-if "%opt%"=="7" exit /b
+if "%opt%"=="4" goto SHOW_CONFIG
+if "%opt%"=="5" exit /b
 goto MENU
 
 :HEADER
@@ -84,6 +80,14 @@ echo   Nhấn phím bất kỳ để quay về menu...
 pause >nul
 color 0B
 goto MENU
+
+:PAUSE_MANAGE_KEY
+echo.
+color 0D
+echo   Nhấn phím bất kỳ để quay về quản lý SSH key...
+pause >nul
+color 0B
+goto MANAGE_KEY
 
 :LIST_KEYS
 cls
@@ -173,6 +177,29 @@ call :MSG_OK "Đã copy public key vào clipboard: %SSH_DIR%\!COPY_KEY!.pub"
 call :PAUSE_MENU
 goto MENU
 
+:MANAGE_KEY
+cls
+call :HEADER
+echo.
+call :BOX "QUẢN LÝ SSH KEY"
+echo.
+call :MENU_ITEM 1 "Tạo SSH mới" 0B
+call :MENU_ITEM 2 "Chỉnh sửa SSH key" 0D
+call :MENU_ITEM 3 "Xoá SSH key" 0C
+call :MENU_ITEM 4 "Test kết nối SSH" 09
+call :MENU_ITEM 0 "Quay về menu chính" 07
+echo.
+color 0E
+choice /c 12340 /n /m "  Chọn thao tác: "
+set "mk_opt=%errorlevel%"
+color 0B
+
+if "!mk_opt!"=="1" goto CREATE_KEY
+if "!mk_opt!"=="2" goto EDIT_KEY
+if "!mk_opt!"=="3" goto DELETE_KEY
+if "!mk_opt!"=="4" goto TEST_SSH
+goto MENU
+
 :CREATE_KEY
 cls
 call :HEADER
@@ -180,20 +207,20 @@ echo.
 call :BOX "TẠO SSH MỚI"
 echo.
 
-call :INPUT_TEXT "Tên key mới (Q để về menu)" NEW_KEY
-if errorlevel 1 goto MENU
-if /i "!NEW_KEY!"=="q" goto MENU
-if "!NEW_KEY!"=="" goto MENU
+call :INPUT_TEXT "Tên key mới (Q để quay lại)" NEW_KEY
+if errorlevel 1 goto MANAGE_KEY
+if /i "!NEW_KEY!"=="q" goto MANAGE_KEY
+if "!NEW_KEY!"=="" goto MANAGE_KEY
 
-call :INPUT_TEXT "Email / comment (Q để về menu)" NEW_EMAIL
-if errorlevel 1 goto MENU
-if /i "!NEW_EMAIL!"=="q" goto MENU
-if "!NEW_EMAIL!"=="" goto MENU
+call :INPUT_TEXT "Email / comment (Q để quay lại)" NEW_EMAIL
+if errorlevel 1 goto MANAGE_KEY
+if /i "!NEW_EMAIL!"=="q" goto MANAGE_KEY
+if "!NEW_EMAIL!"=="" goto MANAGE_KEY
 
 if exist "%SSH_DIR%\!NEW_KEY!" (
     call :MSG_ERROR "Key đã tồn tại: !NEW_KEY!"
-    call :PAUSE_MENU
-    goto MENU
+    call :PAUSE_MANAGE_KEY
+    goto MANAGE_KEY
 )
 
 echo.
@@ -228,8 +255,8 @@ color 0B
 ssh-keygen -t !KEY_TYPE! !KEY_BITS! -C "!NEW_EMAIL!" -f "%SSH_DIR%\!NEW_KEY!"
 
 call :MSG_OK "Hoàn tất. Đã tạo key !KEY_TYPE!: !NEW_KEY!"
-call :PAUSE_MENU
-goto MENU
+call :PAUSE_MANAGE_KEY
+goto MANAGE_KEY
 
 :MANAGE_HOST
 cls
@@ -350,29 +377,29 @@ call :BOX "XOÁ SSH KEY"
 echo.
 
 call :SHOW_KEYS_SELECT
-if errorlevel 1 goto MENU
+if errorlevel 1 goto MANAGE_KEY
 
-call :INPUT_NUMBER "Chọn số key cần xoá (hoặc Q để về menu)" DEL_INDEX
-if errorlevel 1 goto MENU
+call :INPUT_NUMBER "Chọn số key cần xoá (hoặc Q để quay lại)" DEL_INDEX
+if errorlevel 1 goto MANAGE_KEY
 
 call :GET_KEY_BY_INDEX "!DEL_INDEX!" DEL_KEY
 if errorlevel 1 (
     call :MSG_ERROR "Số key không hợp lệ."
-    call :PAUSE_MENU
-    goto MENU
+    call :PAUSE_MANAGE_KEY
+    goto MANAGE_KEY
 )
 
 call :MSG_WARN "Bạn sắp xoá: !DEL_KEY!"
 choice /c YN /n /m "  Xác nhận xoá? [Y/N]: "
-if errorlevel 2 goto MENU
+if errorlevel 2 goto MANAGE_KEY
 
 del /f /q "%SSH_DIR%\!DEL_KEY!" >nul 2>nul
 del /f /q "%SSH_DIR%\!DEL_KEY!.pub" >nul 2>nul
 
 call :REMOVE_KEY_FROM_CONFIG "%SSH_DIR%\!DEL_KEY!"
 call :MSG_OK "Đã xoá key."
-call :PAUSE_MENU
-goto MENU
+call :PAUSE_MANAGE_KEY
+goto MANAGE_KEY
 
 :SHOW_CONFIG
 cls
@@ -400,18 +427,18 @@ echo.
 call :SHOW_HOSTS_TABLE
 if !HOST_COUNT! EQU 0 (
     call :MSG_ERROR "Chưa có host nào trong config để test."
-    call :PAUSE_MENU
-    goto MENU
+    call :PAUSE_MANAGE_KEY
+    goto MANAGE_KEY
 )
 
-call :INPUT_NUMBER "Chọn số host để test (hoặc Q để về menu)" TEST_INDEX
-if errorlevel 1 goto MENU
+call :INPUT_NUMBER "Chọn số host để test (hoặc Q để quay lại)" TEST_INDEX
+if errorlevel 1 goto MANAGE_KEY
 
 call :GET_HOST_BY_INDEX "!TEST_INDEX!" TEST_HOST
 if errorlevel 1 (
     call :MSG_ERROR "Số host không hợp lệ."
-    call :PAUSE_MENU
-    goto MENU
+    call :PAUSE_MANAGE_KEY
+    goto MANAGE_KEY
 )
 
 call :MSG_INFO "Đang test kết nối tới: !TEST_HOST!"
@@ -436,8 +463,136 @@ if "!SSH_EXIT!"=="0" (
 ) else (
     call :MSG_ERROR "Kết nối thất bại (exit code: !SSH_EXIT!). Kiểm tra lại cấu hình."
 )
-call :PAUSE_MENU
-goto MENU
+call :PAUSE_MANAGE_KEY
+goto MANAGE_KEY
+
+:EDIT_KEY
+cls
+call :HEADER
+echo.
+call :BOX "CHỈNH SỬA SSH KEY"
+echo.
+
+call :SHOW_KEYS_SELECT
+if errorlevel 1 goto MANAGE_KEY
+
+call :INPUT_NUMBER "Chọn số key cần chỉnh sửa (hoặc Q để quay lại)" EDIT_INDEX
+if errorlevel 1 goto MANAGE_KEY
+
+call :GET_KEY_BY_INDEX "!EDIT_INDEX!" EDIT_KEY_NAME
+if errorlevel 1 (
+    call :MSG_ERROR "Số key không hợp lệ."
+    call :PAUSE_MANAGE_KEY
+    goto MANAGE_KEY
+)
+
+call :MSG_INFO "Key đã chọn: !EDIT_KEY_NAME!"
+echo.
+color 0A
+echo   Chọn thao tác chỉnh sửa:
+color 0E
+echo   [1] Đổi passphrase
+echo   [2] Đổi comment
+echo   [3] Đổi tên key
+echo   [4] Quay lại
+color 0B
+echo.
+choice /c 1234 /n /m "  Chọn thao tác: "
+set "EDIT_ACT=%errorlevel%"
+
+if "!EDIT_ACT!"=="1" goto EDIT_PASSPHRASE
+if "!EDIT_ACT!"=="2" goto EDIT_COMMENT
+if "!EDIT_ACT!"=="3" goto EDIT_RENAME
+goto MANAGE_KEY
+
+:EDIT_PASSPHRASE
+echo.
+call :MSG_INFO "Đổi passphrase cho key: !EDIT_KEY_NAME!"
+echo.
+color 0E
+echo   (Bạn sẽ được yêu cầu nhập passphrase cũ, sau đó nhập passphrase mới)
+color 0B
+echo.
+ssh-keygen -p -f "%SSH_DIR%\!EDIT_KEY_NAME!"
+if !errorlevel! EQU 0 (
+    call :MSG_OK "Đã đổi passphrase thành công."
+) else (
+    call :MSG_ERROR "Đổi passphrase thất bại."
+)
+call :PAUSE_MANAGE_KEY
+goto MANAGE_KEY
+
+:EDIT_COMMENT
+echo.
+call :INPUT_TEXT "Nhập comment mới (Q để quay lại)" NEW_COMMENT
+if errorlevel 1 goto MANAGE_KEY
+if /i "!NEW_COMMENT!"=="q" goto MANAGE_KEY
+if "!NEW_COMMENT!"=="" (
+    call :MSG_ERROR "Comment không được để trống."
+    call :PAUSE_MANAGE_KEY
+    goto MANAGE_KEY
+)
+
+echo.
+call :MSG_INFO "Đang cập nhật comment cho key: !EDIT_KEY_NAME!"
+color 0E
+echo   (Bạn có thể được yêu cầu nhập passphrase nếu key có mật khẩu)
+color 0B
+echo.
+ssh-keygen -c -C "!NEW_COMMENT!" -f "%SSH_DIR%\!EDIT_KEY_NAME!"
+if !errorlevel! EQU 0 (
+    call :MSG_OK "Đã đổi comment thành công."
+) else (
+    call :MSG_ERROR "Đổi comment thất bại."
+)
+call :PAUSE_MANAGE_KEY
+goto MANAGE_KEY
+
+:EDIT_RENAME
+echo.
+call :INPUT_TEXT "Nhập tên mới cho key (Q để quay lại)" NEW_NAME
+if errorlevel 1 goto MANAGE_KEY
+if /i "!NEW_NAME!"=="q" goto MANAGE_KEY
+if "!NEW_NAME!"=="" (
+    call :MSG_ERROR "Tên không được để trống."
+    call :PAUSE_MANAGE_KEY
+    goto MANAGE_KEY
+)
+
+if exist "%SSH_DIR%\!NEW_NAME!" (
+    call :MSG_ERROR "Key với tên !NEW_NAME! đã tồn tại."
+    call :PAUSE_MANAGE_KEY
+    goto MANAGE_KEY
+)
+
+REM Đổi tên private key
+ren "%SSH_DIR%\!EDIT_KEY_NAME!" "!NEW_NAME!"
+REM Đổi tên public key nếu có
+if exist "%SSH_DIR%\!EDIT_KEY_NAME!.pub" (
+    ren "%SSH_DIR%\!EDIT_KEY_NAME!.pub" "!NEW_NAME!.pub"
+)
+
+REM Cập nhật đường dẫn IdentityFile trong config
+if exist "%CONFIG_FILE%" (
+    break > "%TMP_FILE%"
+    for /f "usebackq delims=" %%L in ("%CONFIG_FILE%") do (
+        set "line=%%L"
+        set "replaced=0"
+        echo(!line! | findstr /i /c:"%SSH_DIR%\!EDIT_KEY_NAME!" >nul
+        if !errorlevel! EQU 0 (
+            >> "%TMP_FILE%" echo(    IdentityFile %SSH_DIR%\!NEW_NAME!
+            set "replaced=1"
+        )
+        if "!replaced!"=="0" (
+            >> "%TMP_FILE%" echo(!line!
+        )
+    )
+    move /y "%TMP_FILE%" "%CONFIG_FILE%" >nul
+)
+
+call :MSG_OK "Đã đổi tên key: !EDIT_KEY_NAME! -> !NEW_NAME!"
+call :PAUSE_MANAGE_KEY
+goto MANAGE_KEY
 
 :SHOW_KEYS_SELECT
 set /a KEY_COUNT=0
